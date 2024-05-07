@@ -1,5 +1,4 @@
 #Este es el flujo principal del sistema de domotica
-from luma.core.render import canvas
 import time
 import timber
 import threading
@@ -9,6 +8,8 @@ import domoticsController as dom
 import displayController as display
 import keyboard as kb
 import spotifyAPI as spotify
+from luma.core.render import canvas
+from datetime import datetime as dt
 
 sp = spotify.auth()
 device = display.device
@@ -41,18 +42,21 @@ state_hour = {
   'date': ''
 }
 state_display = {
-  "screen" : 2,
+  "screen" : 0,
   "option" : 0,
 }
-option = 0
 click = 0
 screen, option = state_display.values()
 sp_queue_in = queue.Queue(maxsize=2)
 sp_queue_out = queue.Queue(maxsize=2)
+state_dom_in_queue = queue.Queue(maxsize=2)
+state_dom_out_queue = queue.Queue(maxsize=2)
 click_queue = queue.Queue(maxsize=2)
+
 
 def exec_func(func):
   func()
+
 
 def control_spotifyThread():
   global option, screen, sp_queue_out, click_queue
@@ -79,24 +83,76 @@ def control_spotifyThread():
       2: not state_spotify['is_playing'],
       4: sp_repeat_state[(state_spotify['repeat_state'] + 1) % 3]
     }
-    if screen == 2 and click == 1:
+    if click == 1:
       execute_sp_func(option, args_funcs)
-      
 
-def dom_inThread():
-  global state_spotify, state_dom_in
-    
+
+def sp_inThread():
+  global state_spotify
   while True:
-    #Obtener datos del sensor de temperatura
-    #Obtener datos del sensor de gas
-    #Obtener la hora y fecha
     state_spotify = spotify.get_current_song_info(sp)
     sp_queue_in.put(state_spotify)
+  
+
+def gasThread():
+  global state_dom_in, state_dom_in_queue, screen
+  gas_bef = True
+  while True:
+    gas = dom.gas_sensor()
+    screen_bef = screen if screen != 5 else screen_bef
+    if (not gas_bef) and gas:
+      screen_bef = screen
+      screen = 5
+    screen = 5 if gas else screen_bef
+    gas_bef = gas
+    state_dom_in['gas'] = gas
+    print(state_dom_in)
+    state_dom_in_queue.put(state_dom_in)
+
+      
+def tempThread():
+  global state_dom_in, state_dom_in_queue
+  while True:
+    hum, temp = dom.temp_sensor()
+    state_dom_in['temp'] = temp
+    state_dom_in['hum'] = hum
+    #print(state_dom_in)
+    state_dom_in_queue.put(state_dom_in)
+
+
+def dom_outThread():
+  global state_dom_out, state_dom_in_queue
+  state_dom_out_queue = state_dom_in_queue
+  state_dom_out_queue.get()
+
+def hourThread():
+  global state_hour
+  weekdays = {
+    0:'Lun',
+    1:'Mar',
+    2:'Mie',
+    3:'Jue',
+    4:'Vie',
+    5:'Sab',
+    6:'Dom',
+  }
+  format_date = lambda x: str(x).zfill(2)
+  while True:
+    today = dt.today()
+    weekday = today.weekday()
+    day = format_date(today.day)
+    month = format_date(today.month)
+    year = today.year
+    hour = format_date(today.hour)
+    minute = format_date(today.minute)
+    date = f"{weekdays[weekday]},{day}-{month}-{year}"
+    hour = f"{hour}:{minute}"
+    state_hour = {'hour': hour, 'date': date}
 
 
 def keyboardThread():
   global option, screen
-  click = 0
+  button_bef = None
   while True:
     button = kb.get_key()
     edge = button in (1,2,3,4) and button_bef == None
@@ -108,7 +164,9 @@ def keyboardThread():
           option += 1
         elif button == 3:
           click_queue.put(1)
-        print(option, click)
+        elif button == 4:
+          screen += 1
+
       elif screen == 4:
         if button == 1 and option == 2:
           option = 1
@@ -116,17 +174,27 @@ def keyboardThread():
           option = 2
         elif button == 3:
           click_queue.put(1)
-      else:
-        option = 0
+        
+      elif screen == 1 and button == 4:
+        screen += 1
+
+      elif screen == 3 and button == 4:
+        screen = 0
+
     button_bef = button
     click_queue.put(0)
 
 
 def displayThread():
   index = 0
-  global device,screen,option,sp_queue_in,option
+  global device,screen,option,sp_queue_in,state_spotify,state_dom_in
   while True:
-    state_spotify = sp_queue_in.get()
+    #state_dom_in = state_dom_in_queue.get()
+    if screen in (1,4,5):
+      state_dom_in = state_dom_in_queue.get()
+    if screen == 2:
+      state_spotify = sp_queue_in.get()
+
     args_screens = {
       0: (screen, state_dom_out ,option),
       1: (screen, state_dom_in),
@@ -135,14 +203,22 @@ def displayThread():
       4: option,
       5: None
     }
+    #print(screen)
     #print(f"Desde hilo de display: {sp_queue_in}")
     with canvas(device) as draw:
       display.controller(draw, screen, args_screens[screen])
-      index = 0 if state_display['screen'] != 2 else (index + 1) % len(state_spotify['title']) 
+      index = 0 if screen != 2 else (index + 1) % len(state_spotify['title']) 
 
 
 if __name__ == "__main__":
-  threads_funcs = [dom_inThread, keyboardThread, control_spotifyThread, displayThread]
+  threads_funcs = [tempThread, 
+                   gasThread, 
+                   hourThread,
+                   dom_outThread, 
+                   keyboardThread, 
+                   sp_inThread, 
+                   control_spotifyThread, 
+                   displayThread]
   threads = []
   for i in range(len(threads_funcs)):
     thread = threading.Thread(target=exec_func, args=(threads_funcs[i],))

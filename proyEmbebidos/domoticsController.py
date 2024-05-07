@@ -47,20 +47,17 @@ def servomotor(pin: int):
 #Sensor de temperatura que controla el ventilador
 def temp_sensor():
   sensor = Adafruit_DHT.DHT11
-  humidity, temperature = Adafruit_DHT.read_retry(sensor, temp_sensor_pin)
+  humidity, temperature = Adafruit_DHT.read(sensor, temp_sensor_pin)
 
   if humidity is not None and temperature is not None:
-        print('Temp={0:0.1f}*  Humidity={1:0.1f}%'.format(temperature, humidity))
+      return int(humidity), int(temperature)
   else:
-      print('Failed to get reading. Try again!')
+      return (-1,-1)
 
 #Sensor de gas natural
 def gas_sensor():
   gas = GPIO.input(gas_sensor_pin)
-  if not gas:
-    print("Hay gas")
-  else: 
-    print("no hay gas")
+  return not gas
 
 #Control del ventilador
 def fan_control():
@@ -72,3 +69,6 @@ def fan_control():
 def control_led():
   pixels.fill((10, 0, 0))
   pixels.show()
+
+""" while True:
+  print(temp_sensor()) """

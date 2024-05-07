@@ -52,8 +52,16 @@ def menu_indicators(draw, screen):
 #Opciones: puerta principal y del perro, comida de perros, ventilador, luz
 def menu_screen(draw, args_tuple):
     screen, state, option = args_tuple
+    option_circles = {
+        0:(14,18,31,36),
+        1:(54,18,71,36),
+        2:(94,18,111,36),
+        3:(34,38,51,56),
+        4:(74,38,91,56)
+    }
+
     draw.text((1,0), "Menu domotica", fill="white")
-    draw.ellipse((14,18,31,36), outline="white", fill=None, width=1)
+    draw.ellipse(option_circles[option], outline="white", fill=None, width=1)
     draw.bitmap((15,20), closed_door_icon, fill="white")
     draw.bitmap((55,20), closed_dog_door_icon, fill="white")
     draw.bitmap((95,20), dog_icon, fill="white")
@@ -73,8 +81,8 @@ def temperature_screen(draw, args_tuple):
     draw.rounded_rectangle((1,5,36,50), radius=5,outline="white",width=1)
     draw.text((45,17), "TEMP", fill="white", font_size=7)
     draw.text((45,42), "HUM", fill="white", font_size=7) 
-    draw.text((80,7), "30°C", fill="white", font_size=15)
-    draw.text((80,32), "10%", fill="white", font_size=15) 
+    draw.text((80,7), f"{temp_state}°C", fill="white", font_size=15)
+    draw.text((80,32), f"{hum_state}%", fill="white", font_size=15) 
     draw.text((3,39), "WARM", fill="white", font_size=9) 
     menu_indicators(draw, screen)
 
@@ -131,13 +139,16 @@ def spotify_screen(draw, args_tuple):
     menu_indicators(draw, screen)
 
 
-def hour_screen(draw, screen, state):
+def hour_screen(draw, args_tuple):
+    screen, state = args_tuple
+    hour = state['hour']
+    date = state['date']
     draw.bitmap((0,15), clock_icon, fill="white")
     draw.rounded_rectangle((38,12,120,37),radius=5,outline="white", fill=None ,width=1)
     draw.rounded_rectangle((38,39,120,51),radius=5,outline="white", fill=None ,width=1)
-    draw.text((42,5),'03:29',fill="white", font_size=30)
-    draw.text((40,40),'Sab, 24-05-2024', fill="white", font_size=10)
-    menu_indicators(draw)
+    draw.text((42,5), hour, fill="white", font_size=30)
+    draw.text((40,40), date, fill="white", font_size=10)
+    menu_indicators(draw, screen)
 
 
 def timber_notif(draw, option):
@@ -167,15 +178,9 @@ def controller(draw, screen, args_tuple):
         5: gas_notif
     }
     if screen in screens:
-        if screen == 0:
+        if screen in (0,1,2,3,4):
             screens[screen](draw, args_tuple)
-        elif screen in (1,3):
-            screens[screen](draw, args_tuple)
-        elif screen == 2:
-            screens[screen](draw, args_tuple)
-        elif screen in 4:
-            screens[screen](draw, args_tuple)
-        elif screen in 5:
+        else:
             screens[screen](draw)
     else:
         print("Estado invalido")

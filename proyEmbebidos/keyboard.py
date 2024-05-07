@@ -27,3 +27,6 @@ def get_key():
     return 4;
 
   return None
+
+""" while True:
+  print(get_key()) """
