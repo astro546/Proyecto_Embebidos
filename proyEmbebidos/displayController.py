@@ -168,13 +168,17 @@ def hour_screen(draw, args_tuple):
 
 
 def timber_notif(draw, option):
+    fill_rect_1 = None if option == 1 else "white"
+    fill_rect_2 = None if option == 0 else "white"
+    text_color_1 = "black" if option == 0 else "white"
+    text_color_2 = "black" if option == 1 else "white"
     draw.text((8,0), "Abrir puerta principal?", fill="white")
     draw.bitmap((40,20), door_icon, fill="white")
     draw.bitmap((70,20), timber_icon, fill="white")
-    draw.rounded_rectangle((10,52,60,62), radius=5,outline="white", fill="white" ,width=1)
-    draw.rounded_rectangle((70,52,120,62),radius=5,outline="white", fill=None ,width=1)
-    draw.text((30,52),"Si", fill="black", font_size=9)
-    draw.text((90,52),"No", fill="white", font_size=9)
+    draw.rounded_rectangle((10,52,60,62), radius=5,outline="white", fill=fill_rect_1 ,width=1)
+    draw.rounded_rectangle((70,52,120,62),radius=5,outline="white", fill=fill_rect_2 ,width=1)
+    draw.text((30,52),"Si", fill=text_color_1, font_size=9)
+    draw.text((90,52),"No", fill=text_color_2, font_size=9)
 
 
 def gas_notif(draw, args_tuple=None):

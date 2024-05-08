@@ -4,7 +4,7 @@ import timber
 import threading
 import queue
 import domoticsController as dom
-#import doorSecurity as sec
+import doorSecurity as sec
 import displayController as display
 import keyboard as kb
 import spotifyAPI as spotify
@@ -54,6 +54,7 @@ state_dom_in_queue = queue.Queue(maxsize=2)
 state_dom_out_queue = queue.Queue(maxsize=2)
 click_queue = queue.Queue(maxsize=2)
 click_sp_queue = queue.Queue(maxsize=2)
+click_ard_queue = queue.Queue(maxsize=2)
 
 def exec_func(func):
   func()
@@ -174,6 +175,24 @@ def dom_outThread():
       #print(state_dom_out)
 
 
+def arduinoThread():
+    global screen, option, state_dom_in
+    msg = sec.processMsg()
+    if msg == 'W':
+      dom.servomotor(dom.main_door, 1)
+      state_dom_in['p_main'] = 1
+    elif msg == 'T':
+      screen = 4
+    if screen == 4:
+      click = click_ard_queue.get()
+      if click == 1:
+        if option == 0:
+          #print(option, click)
+          dom.servomotor(dom.main_door, 1)
+          state_dom_in['p_main'] = 1
+        screen = 0
+    sec.sendCmd(msg)
+
 def hourThread():
   global state_hour
   weekdays = {
@@ -220,12 +239,13 @@ def keyboardThread():
           option = 0
 
       elif screen == 4:
-        if button == 1 and option == 2:
+        if button == 2 and option == 0:
           option = 1
-        elif button == 2 and option == 1:
-          option = 2
+        elif button == 1 and option == 1:
+          option = 0
         elif button == 3:
-          click_queue.put(1)
+          print(screen, click)
+          click_ard_queue.put(1)
         
       elif screen == 1 and button == 4:
         screen += 1
@@ -269,6 +289,7 @@ if __name__ == "__main__":
                    gasThread, 
                    hourThread,
                    dom_outThread, 
+                   arduinoThread,
                    keyboardThread, 
                    sp_inThread, 
                    control_spotifyThread, 

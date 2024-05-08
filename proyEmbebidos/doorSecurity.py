@@ -34,16 +34,21 @@ def processMsg():
       print(f"Texto recibido: {cadena.decode()}")
       if 'Timber' in cadena.decode():
         return 'T'
+    return 'N'
   except UnicodeDecodeError:
     #print(f"Pin encriptado: {cadena}")
     #print(f"tamaño del texto encriptado: {len(cadena)}")
-    is_verified = verify_pin(cadena)
-    if is_verified:
-      command = 'W'
-    else:
-      command = 'D'
-    return command
+    if len(cadena) > 0:
+      is_verified = verify_pin(cadena)
+      if is_verified:
+        command = 'W'
+      else:
+        command = 'D'
+      return command
+    return 'N'
 
 def sendCmd(command):
   arduino.write(command.encode())
 
+""" while True:
+  processMsg() """
