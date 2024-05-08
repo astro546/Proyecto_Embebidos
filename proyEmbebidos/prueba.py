@@ -1,36 +1,19 @@
-import threading
-from threading import Semaphore
-import time
+# Set up libraries and overall settings
+import RPi.GPIO as GPIO  # Imports the standard Raspberry Pi GPIO library
+from time import sleep   # Imports sleep (aka wait or pause) into the program
+GPIO.setmode(GPIO.BCM) # Sets the pin numbering system to use the physical layout
+pin = 18
+# Set up pin 11 for PWM
+GPIO.setup(pin,GPIO.OUT)  # Sets up pin 11 to an output (instead of an input)
+p = GPIO.PWM(pin, 50)     # Sets up pin 11 as a PWM pin
+p.start(0)               # Starts running PWM on the pin and sets it to 0
 
-NTHREADS = 20
-WIDTH = 1
+# Move the servo back and forth
+p.ChangeDutyCycle(11)     # Changes the pulse width to 3 (so moves the servo)
+sleep(2)                 # Wait 1 second
+p.ChangeDutyCycle(6)    # Changes the pulse width to 12 (so moves the servo)
+sleep(2)
 
-shared_variable = 0  # Variable compartida entre hilos
-shared_time = 0  # Variable compartida para el tiempo actual
-numero_hilos = NTHREADS  # Número de hilos a crear
-hilos = []  # Lista para almacenar los objetos hilo
-
-def funcion_hilo(id_hilo):
-  global shared_variable, shared_time  # Declarar variables globales
-
-  while True:
-    # Modificar la variable compartida
-    shared_variable += 1
-    print(f"Hilo {id_hilo}: valor compartido = {shared_variable}")
-
-    # Simular trabajo del hilo (retardo basado en ID)
-    time.sleep(id_hilo+1)
-
-if __name__ == "__main__":
-  for i in range(numero_hilos):
-    # Crear un nuevo hilo y pasarlo a la función
-    hilo = threading.Thread(target=funcion_hilo, args=(i,))
-    hilos.append(hilo)  # Agregar el hilo a la lista
-
-  # Iniciar todos los hilos
-  for hilo in hilos:
-    hilo.start()
-
-  # Esperar a que todos los hilos terminen (opcional)
-"""   for hilo in hilos:
-    hilo.join() """
+# Clean up everything
+p.stop()                 # At the end of the program, stop the PWM
+GPIO.cleanup()           # Resets the GPIO pins back to defaults

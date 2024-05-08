@@ -84,7 +84,6 @@ def control_spotifyThread():
       2: not state_spotify['is_playing'],
       4: sp_repeat_state[(state_spotify['repeat_state'] + 1) % 3]
     }
-    print(f"Desde control_sp: {click, screen}")
     if click == 1 and screen == 2:
       execute_sp_func(option, args_funcs)
 
@@ -94,6 +93,7 @@ def sp_inThread():
   while True:
     state_spotify = spotify.get_current_song_info(sp)
     sp_queue_in.put(state_spotify)
+    #print(state_spotify)
   
 
 def gasThread():
@@ -123,8 +123,8 @@ def tempThread():
 
 
 def dom_outThread():
-  global state_dom_out, state_dom_in_queue, option
-  def exec_dom_out():
+  global state_dom_out, state_dom_in
+  def exec_dom_out(option, action):
     pin = sp_funcs[option][1]
     sp_funcs[option][0](pin, action)
 
@@ -144,27 +144,33 @@ def dom_outThread():
     3:"fan",
     4:"light"
   }
-  action = 0
+  #action_pin = 0
+  temp = 0
 
   while True:
     state_fan = state_dom_out['fan'] 
-    state_dom_out_queue = state_dom_in_queue
+    #state_dom_out_queue = state_dom_in_queue
     click = click_queue.get()
-    #print(option, click)
+    #print(option)
+    if state_fan == 2:
+      temp = state_dom_in['temp']
+      action_fan = control_fan_temp(temp)
+      exec_dom_out(3, action_fan)
     if screen == 0:
       #print(f"Desde menu: {click, screen}")
-      if state_fan == 2 or option == 3:
-          temp = state_dom_out_queue.get()['temp']
-          action = state_fan if state_fan in (0,1) else control_fan_temp(temp)
-          exec_dom_out()
-      elif click == 1:
-        print(option)
-        if option == 3:
+      if option == 3:
+        if click == 1:
+          state_dom_out['fan'] = 0 if state_dom_out['fan'] == 2 else state_dom_out['fan']+1
           state_fan = state_dom_out['fan']
-          state_dom_out['fan'] += 1
-        else:
-          action = not state_dom_out[options[option]]
-          exec_dom_out()
+          if state_fan == 0:
+            action_fan = 0
+          else: 
+            action_fan = 1
+            exec_dom_out(3, action_fan)        
+      elif click == 1:
+        action_pin = not state_dom_out[options[option]]
+        exec_dom_out(option, action_pin)
+        state_dom_out[options[option]] = action_pin
       #print(state_dom_out)
 
 
@@ -211,6 +217,7 @@ def keyboardThread():
           #print("Click presionado")
         elif button == 4:
           screen += 1
+          option = 0
 
       elif screen == 4:
         if button == 1 and option == 2:
@@ -222,9 +229,11 @@ def keyboardThread():
         
       elif screen == 1 and button == 4:
         screen += 1
+        option = 0
 
       elif screen == 3 and button == 4:
         screen = 0
+        option = 0
 
     button_bef = button
     click_queue.put(0)

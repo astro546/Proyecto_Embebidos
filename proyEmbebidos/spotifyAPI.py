@@ -22,10 +22,16 @@ def auth():
   return sp
 
 def start_pause(sp, state):
-  if state:
-    sp.start_playback()
-  else:
-    sp.pause_playback()
+  try:
+    if state:
+      sp.start_playback()
+    else:
+      sp.pause_playback()
+  except:
+    if state:
+      sp.pause_playback()
+    else:
+      sp.start_playback()
 
 def next_track(sp):
   sp.next_track()

@@ -22,7 +22,7 @@ def servomotor(pin: int, action: bool):
   GPIO.setup(22, GPIO.OUT)
   p = GPIO.PWM(pin, 50)     
   p.start(0)               
-
+  #print(action)
   if pin != 22:
     # El ciclo de trabajo en 11 abre la puerta
     # En 6 cierra la puerta
@@ -34,6 +34,7 @@ def servomotor(pin: int, action: bool):
     p.ChangeDutyCycle(11)
     sleep(2)      
     p.ChangeDutyCycle(6)
+    sleep(2)
 
   p.stop()                 
   GPIO.cleanup()           
