@@ -1,12 +1,12 @@
 import RPi.GPIO as gpio
 
-gpio.setmode(gpio.BCM)
-gpio.setup(6, gpio.IN)
-gpio.setup(13, gpio.IN)
-gpio.setup(19, gpio.IN)
-gpio.setup(26, gpio.IN)
-
 def get_key():
+  gpio.setmode(gpio.BCM)
+  gpio.setup(6, gpio.IN)
+  gpio.setup(13, gpio.IN)
+  gpio.setup(19, gpio.IN)
+  gpio.setup(26, gpio.IN)
+  
   b1 = gpio.input(13)
   b2 = gpio.input(6)
   b3 = gpio.input(26)

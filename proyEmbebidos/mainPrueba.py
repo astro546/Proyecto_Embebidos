@@ -8,6 +8,7 @@ import domoticsController as dom
 import displayController as display
 import keyboard as kb
 import spotifyAPI as spotify
+import RPi.GPIO as GPIO 
 from luma.core.render import canvas
 from datetime import datetime as dt
 
@@ -16,8 +17,8 @@ device = display.device
 index = 0
 block_arduino = False
 state_dom_in = {
-  "temp": "0°C",
-  "hum": "0%",
+  "temp": 0,
+  "hum": 0,
   "gas": 0,
 }
 state_dom_out = {
@@ -52,14 +53,14 @@ sp_queue_out = queue.Queue(maxsize=2)
 state_dom_in_queue = queue.Queue(maxsize=2)
 state_dom_out_queue = queue.Queue(maxsize=2)
 click_queue = queue.Queue(maxsize=2)
-
+click_sp_queue = queue.Queue(maxsize=2)
 
 def exec_func(func):
   func()
 
 
 def control_spotifyThread():
-  global option, screen, sp_queue_out, click_queue
+  global option, screen, sp_queue_out, click_queue, click_sp_queue
   sp_repeat_state = {0:'off', 1:'context', 2:'track'}
   sp_funcs = {
     0:spotify.shuffle,
@@ -77,13 +78,14 @@ def control_spotifyThread():
   while True:
     sp_queue_out = sp_queue_in
     state_spotify = sp_queue_out.get()
-    click = click_queue.get()
+    click = click_sp_queue.get()
     args_funcs = {
       0: not state_spotify['shuffle_state'],
       2: not state_spotify['is_playing'],
       4: sp_repeat_state[(state_spotify['repeat_state'] + 1) % 3]
     }
-    if click == 1:
+    print(f"Desde control_sp: {click, screen}")
+    if click == 1 and screen == 2:
       execute_sp_func(option, args_funcs)
 
 
@@ -106,7 +108,7 @@ def gasThread():
     screen = 5 if gas else screen_bef
     gas_bef = gas
     state_dom_in['gas'] = gas
-    print(state_dom_in)
+    #print(state_dom_in)
     state_dom_in_queue.put(state_dom_in)
 
       
@@ -121,9 +123,50 @@ def tempThread():
 
 
 def dom_outThread():
-  global state_dom_out, state_dom_in_queue
-  state_dom_out_queue = state_dom_in_queue
-  state_dom_out_queue.get()
+  global state_dom_out, state_dom_in_queue, option
+  def exec_dom_out():
+    pin = sp_funcs[option][1]
+    sp_funcs[option][0](pin, action)
+
+  control_fan_temp = lambda x: 0 if int(x) < 23 else 1
+
+  sp_funcs = {
+    0:(dom.servomotor, dom.main_door),
+    1:(dom.servomotor, dom.dog_door),
+    2:(dom.servomotor, dom.dog_food),
+    3:(dom.fan_control, dom.fan_pin),
+    4:(dom.control_led, dom.led_pin),
+  }
+  options = {
+    0:"p_main",
+    1:"p_dog",
+    2:"dog_food",
+    3:"fan",
+    4:"light"
+  }
+  action = 0
+
+  while True:
+    state_fan = state_dom_out['fan'] 
+    state_dom_out_queue = state_dom_in_queue
+    click = click_queue.get()
+    #print(option, click)
+    if screen == 0:
+      #print(f"Desde menu: {click, screen}")
+      if state_fan == 2 or option == 3:
+          temp = state_dom_out_queue.get()['temp']
+          action = state_fan if state_fan in (0,1) else control_fan_temp(temp)
+          exec_dom_out()
+      elif click == 1:
+        print(option)
+        if option == 3:
+          state_fan = state_dom_out['fan']
+          state_dom_out['fan'] += 1
+        else:
+          action = not state_dom_out[options[option]]
+          exec_dom_out()
+      #print(state_dom_out)
+
 
 def hourThread():
   global state_hour
@@ -164,6 +207,8 @@ def keyboardThread():
           option += 1
         elif button == 3:
           click_queue.put(1)
+          click_sp_queue.put(1)
+          #print("Click presionado")
         elif button == 4:
           screen += 1
 

@@ -52,21 +52,37 @@ def menu_indicators(draw, screen):
 #Opciones: puerta principal y del perro, comida de perros, ventilador, luz
 def menu_screen(draw, args_tuple):
     screen, state, option = args_tuple
-    option_circles = {
-        0:(14,18,31,36),
-        1:(54,18,71,36),
-        2:(94,18,111,36),
-        3:(34,38,51,56),
-        4:(74,38,91,56)
+    p_main_state = state['p_main']
+    p_dog_state = state['p_dog']
+    dog_food_state = state['dog_food']
+    fan_state = state['fan']
+    light_state = state['light']
+
+    states = {
+        0: p_main_state,
+        1: p_dog_state,
+        2: dog_food_state,
+        3: fan_state,
+        4: light_state
     }
 
-    draw.text((1,0), "Menu domotica", fill="white")
-    draw.ellipse(option_circles[option], outline="white", fill=None, width=1)
-    draw.bitmap((15,20), closed_door_icon, fill="white")
-    draw.bitmap((55,20), closed_dog_door_icon, fill="white")
-    draw.bitmap((95,20), dog_icon, fill="white")
-    draw.bitmap((35,40), fan_on_icon, fill="white")
-    draw.bitmap((75,38), led_off_icon, fill="white")
+    option_displays = {
+        0:((14,18,31,36), open_door_icon, closed_door_icon, "Abrir Puerta", "Cerrar Puerta Principal"),
+        1:((54,18,71,36), open_dog_door_icon, closed_dog_door_icon, "Abrir Puerta Perro", "Cerrar Puerta Perro"),
+        2:((94,18,111,36), dog_icon, dog_icon, "Alimentar al perro", "Alimentar al perro"),
+        3:((34,38,51,56), fan_on_icon, fan_off_icon, fan_on_icon, "Prender ventilador", "Vent. Automatico", "Apagar Ventilador"),
+        4:((74,38,91,56), led_on_icon, led_off_icon,"Prender LED", "Apagar LED")
+    }
+    initial_index = 3 if option != 3 else 4
+    option_text = option_displays[option][initial_index+states[option]]
+
+    draw.text((1,0), option_text, fill="white")
+    draw.ellipse(option_displays[option][0], outline="white", fill=None, width=1)
+    draw.bitmap((15,20), option_displays[0][1+p_main_state], fill="white")
+    draw.bitmap((55,20), option_displays[1][1+p_dog_state], fill="white")
+    draw.bitmap((95,20), option_displays[2][1+dog_food_state], fill="white")
+    draw.bitmap((35,40), option_displays[3][1+fan_state], fill="white")
+    draw.bitmap((75,38), option_displays[4][1+light_state], fill="white")
     menu_indicators(draw, screen)
 
 

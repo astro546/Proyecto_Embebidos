@@ -1,45 +1,39 @@
 import RPi.GPIO as GPIO  
 from time import sleep
 import Adafruit_DHT
-import board
-import neopixel
 
 #Definicion de pines
 gas_sensor_pin = 23
 temp_sensor_pin = 27
 fan_pin = 4
-servo1 = 17
-servo2 = 18
-servo3 = 22
+main_door = 17
+dog_door = 18
+dog_food = 22
+led_pin = 21
 
-pixel_pin = board.D21
-num_pixels = 8
-ORDER = neopixel.RGB
-pixels = neopixel.NeoPixel(
-    pixel_pin, num_pixels, brightness=0.2, auto_write=False, pixel_order=ORDER
-)
-
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(gas_sensor_pin, GPIO.IN)  
 GPIO.setup(temp_sensor_pin, GPIO.IN)
-GPIO.setup(fan_pin, GPIO.OUT)
-GPIO.setup(servo1, GPIO.OUT)  
-GPIO.setup(servo2, GPIO.OUT)  
-GPIO.setup(servo2, GPIO.OUT)  
 
 #El servomotor controlara las puertas
-def servomotor(pin: int):
-  #Configuramos el pin a 50 Hz en PWM y un ciclo de trabajo de 0
-  GPIO.setup(pin,GPIO.OUT)  
+def servomotor(pin: int, action: bool):
+  #Configuramos el pin a 50 Hz en PWM y un ciclo de trabajo de 0  
+  GPIO.setmode(GPIO.BCM)
+  GPIO.setup(17, GPIO.OUT)  
+  GPIO.setup(18, GPIO.OUT)  
+  GPIO.setup(22, GPIO.OUT)
   p = GPIO.PWM(pin, 50)     
   p.start(0)               
 
-  # Mueve el servo hacia un lado y hacia el otro 
-  # Para esto se cambia el ciclo de trabajo
-  p.ChangeDutyCycle(6)     
-  sleep(1)                 
-  p.ChangeDutyCycle(11)    
-  sleep(1)
+  if pin != 22:
+    # El ciclo de trabajo en 11 abre la puerta
+    # En 6 cierra la puerta
+    duty_cycle = 11 if action else 6
+    p.ChangeDutyCycle(duty_cycle)
+    sleep(0.5)
+
+  else:
+    p.ChangeDutyCycle(11)
+    sleep(2)      
+    p.ChangeDutyCycle(6)
 
   p.stop()                 
   GPIO.cleanup()           
@@ -56,19 +50,26 @@ def temp_sensor():
 
 #Sensor de gas natural
 def gas_sensor():
+  GPIO.setmode(GPIO.BCM)
+  GPIO.setup(gas_sensor_pin, GPIO.IN)
   gas = GPIO.input(gas_sensor_pin)
   return not gas
 
 #Control del ventilador
-def fan_control():
-  GPIO.output(fan_pin, GPIO.HIGH)
-  sleep(10)
-  GPIO.output(fan_pin, GPIO.LOW)
+def fan_control(fan_pin: int, action: bool):
+  GPIO.setmode(GPIO.BCM)
+  GPIO.setup(fan_pin, GPIO.OUT)
+  output = GPIO.HIGH if action else GPIO.LOW
+  GPIO.output(fan_pin, output)
 
 #Control de los LEDs
-def control_led():
-  pixels.fill((10, 0, 0))
-  pixels.show()
+def control_led(pin:int, action: bool):
+  GPIO.setmode(GPIO.BCM)
+  GPIO.setup(pin, GPIO.OUT)
+  output = GPIO.HIGH if action else GPIO.LOW
+  GPIO.output(pin, output)
 
 """ while True:
   print(temp_sensor()) """
+#servomotor(main_door, 0)
+#fan_control(4,0)
