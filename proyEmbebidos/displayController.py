@@ -1,7 +1,7 @@
+#Este archivo contiene todas las funciones de las pantallas del display
 from luma.core.interface.serial import i2c
 from luma.oled.device import sh1106
 from PIL import Image
-from time import sleep
 
 #Display: SH1106 128x64
 #Seteamos el puerto y la direccion de la pantalla
@@ -38,7 +38,7 @@ prev_icon =         Image.open('icons/spotify/anterior-pista.png').convert(devic
 shuffle_icon =      Image.open('icons/spotify/barajar.png').convert(device.mode)
 not_shuffle_icon =  Image.open('icons/spotify/flecha-abajo.png').convert(device.mode)
 
-#Indicadores del menu actual
+#menu_indicators: Muestra los indicadores del menu actual
 def menu_indicators(draw, screen):
     for i in range(4):
         fill_circle = None if i != screen else "white"
@@ -48,7 +48,7 @@ def menu_indicators(draw, screen):
             outline="white", 
             width=1)
 
-#Menu principal del sistema de domotica
+#menu_screen: Menu principal del sistema de domotica
 #Opciones: puerta principal y del perro, comida de perros, ventilador, luz
 def menu_screen(draw, args_tuple):
     screen, state, option = args_tuple
@@ -67,7 +67,7 @@ def menu_screen(draw, args_tuple):
     }
 
     option_displays = {
-        0:((14,18,31,36), open_door_icon, closed_door_icon, "Abrir Puerta", "Cerrar Puerta Principal"),
+        0:((14,18,31,36), open_door_icon, closed_door_icon, "Abrir Puerta Principal", "Cerrar Puerta Principal"),
         1:((54,18,71,36), open_dog_door_icon, closed_dog_door_icon, "Abrir Puerta Perro", "Cerrar Puerta Perro"),
         2:((94,18,111,36), dog_icon, dog_icon, "Alimentar al perro", "Alimentar al perro"),
         3:((34,38,51,56), fan_on_icon, fan_off_icon, fan_on_icon, "Prender ventilador", "Vent. Automatico", "Apagar Ventilador"),
@@ -86,6 +86,7 @@ def menu_screen(draw, args_tuple):
     menu_indicators(draw, screen)
 
 
+#temperature_screen: Pantalla que muestra informacion del sensor de temperatura
 def temperature_screen(draw, args_tuple):
     screen, state = args_tuple
     temp_state = state['temp']
@@ -103,7 +104,9 @@ def temperature_screen(draw, args_tuple):
     menu_indicators(draw, screen)
 
 
+#spotify_screen: Muestra la pantalla de Spotify
 def spotify_screen(draw, args_tuple):
+    #scrolling_text: Esta funcion da el movimiento lateral al titulo de la cancion
     def scrolling_text(i, title_str):
         len_title = len(title_str)
         little_str = len_title <= 16
@@ -115,6 +118,8 @@ def spotify_screen(draw, args_tuple):
         #sleep(0.01)
         return title_buffer
     
+    #draw_control_icons: Esta funcion muestra los iconos de control de Spotify.
+    #Los iconos cambian dependiendo del estado del reproductor de Spotify
     def draw_control_icons(draw, shuffle_state, repeat_state, play_state, option):
         x_option_left = 40+(option*17)
         x_option_right = x_option_left + 13
@@ -128,33 +133,39 @@ def spotify_screen(draw, args_tuple):
         draw.bitmap((110,40), repeat_state_icon[repeat_state], fill="white")
         draw.ellipse((x_option_left,37,x_option_right,52), fill=None, outline="white", width=1)
 
+    #Esta funcion calcula la longitud de la barra de progreso de la cancion
     def calc_progress_bar_len(progress_ms, duration_ms):
         interval_ms = int(duration_ms / 40)
         interval_prog = int(progress_ms / interval_ms)
         return interval_prog * 2
 
     screen, sp_state, option, index = args_tuple
-    title = sp_state['title']
-    progress = sp_state['progress']
-    duration = sp_state['duration']
-    progress_ms = sp_state['progress_ms']
-    duration_ms = sp_state['duration_ms']
-    shuffle_state = sp_state['shuffle_state']
-    repeat_state = sp_state['repeat_state']
-    play_state = sp_state['is_playing']
-    title_buffer = scrolling_text(index,title)
-    len_play_bar = calc_progress_bar_len(progress_ms, duration_ms)
+    if not sp_state['available']:
+        draw.text((0,5),"Ningun dispositivo", fill="white")
+        draw.text((0,15),"disponible", fill="white")
+    else:
+        title = sp_state['title']
+        progress = sp_state['progress']
+        duration = sp_state['duration']
+        progress_ms = sp_state['progress_ms']
+        duration_ms = sp_state['duration_ms']
+        shuffle_state = sp_state['shuffle_state']
+        repeat_state = sp_state['repeat_state']
+        play_state = sp_state['is_playing']
+        title_buffer = scrolling_text(index,title)
+        len_play_bar = calc_progress_bar_len(progress_ms, duration_ms)
 
-    draw.bitmap((0,15), spotify_icon, fill="white")
-    draw.text((40,5),title_buffer, fill="white")
-    draw.text((40,20), progress, fill="white", font_size=7)
-    draw.text((102,20), duration, fill="white", font_size=7)
-    draw.rounded_rectangle((39,28,121,31),radius=5,outline="white", fill=None ,width=1)
-    draw.line(((40,29),(40+len_play_bar,29)), fill="white" ,width=2)
-    draw_control_icons(draw, shuffle_state, repeat_state, play_state, option)
-    menu_indicators(draw, screen)
+        draw.bitmap((0,15), spotify_icon, fill="white")
+        draw.text((40,5),title_buffer, fill="white")
+        draw.text((40,20), progress, fill="white", font_size=7)
+        draw.text((102,20), duration, fill="white", font_size=7)
+        draw.rounded_rectangle((39,28,121,31),radius=5,outline="white", fill=None ,width=1)
+        draw.line(((40,29),(40+len_play_bar,29)), fill="white" ,width=2)
+        draw_control_icons(draw, shuffle_state, repeat_state, play_state, option)
+        menu_indicators(draw, screen)
 
 
+#hour_screen: Esta pantalla muestra la fecha y la hora.
 def hour_screen(draw, args_tuple):
     screen, state = args_tuple
     hour = state['hour']
@@ -167,6 +178,8 @@ def hour_screen(draw, args_tuple):
     menu_indicators(draw, screen)
 
 
+#timber_notif: Esta pantalla se muestra cuando alguien toco el timbre de la puerta principal
+#Dentro de esta pantalla el usuario decidira si elige abrir la puerta o no
 def timber_notif(draw, option):
     fill_rect_1 = None if option == 1 else "white"
     fill_rect_2 = None if option == 0 else "white"
@@ -181,6 +194,7 @@ def timber_notif(draw, option):
     draw.text((90,52),"No", fill=text_color_2, font_size=9)
 
 
+#gas_notif: Esta pantalla se muestra cuando el sensor de gas detecto gas
 def gas_notif(draw, args_tuple=None):
     draw.bitmap((0,15), fire_icon, fill="white")
     draw.text((40,5), "ALERTA!!", fill="white", font_size=20)
@@ -188,6 +202,7 @@ def gas_notif(draw, args_tuple=None):
     draw.text((55,37), "DE GAS", fill="white", font_size=15)
 
 
+#controller: Esta funcion muestra la pantalla dependiendo de las acciones del usuario
 def controller(draw, screen, args_tuple):
     screens = {
         0: menu_screen,

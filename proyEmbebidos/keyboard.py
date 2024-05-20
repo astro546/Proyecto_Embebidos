@@ -1,5 +1,7 @@
+#Este archivo contiene el codigo que maneja los eventos de los botones
 import RPi.GPIO as gpio
 
+#get_key: Obtiene el boton presionado por el usuario
 def get_key():
   gpio.setmode(gpio.BCM)
   gpio.setup(6, gpio.IN)
@@ -27,6 +29,3 @@ def get_key():
     return 4;
 
   return None
-
-""" while True:
-  print(get_key()) """

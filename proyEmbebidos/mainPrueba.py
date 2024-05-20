@@ -1,6 +1,4 @@
 #Este es el flujo principal del sistema de domotica
-import time
-import timber
 import threading
 import queue
 import domoticsController as dom
@@ -11,16 +9,28 @@ import spotifyAPI as spotify
 import RPi.GPIO as GPIO 
 from luma.core.render import canvas
 from datetime import datetime as dt
+from time import sleep
 
+#EL objeto sp autentica la cuenta de spotify del usuario
 sp = spotify.auth()
+
+#device especifica el modelo del display OLED, el cual es el SH1106
 device = display.device
+
+#Index es un indice usado al mostrar la pantalla de spotify
 index = 0
+
 block_arduino = False
+
+#Los siguientes diccionarios gestionan el control de los estados del sistema:
+#state_dom_in: Contiene el estado de los sensores de temperatura y gas
 state_dom_in = {
   "temp": 0,
   "hum": 0,
   "gas": 0,
 }
+
+#state_dom_out: Contiene el estado de las puertas, el ventilador y la luz
 state_dom_out = {
   "p_main":0,
   "p_dog": 0,
@@ -28,7 +38,10 @@ state_dom_out = {
   "fan": 0,
   "light": 0
 }
+
+#state_spotify: Contiene el estado del reproductor de spotify
 state_spotify = {
+  "available": False,
   "title" : '',
   "progress_ms" : '',
   "duration_ms" : '',
@@ -38,28 +51,54 @@ state_spotify = {
   "shuffle_state": '',
   "repeat_state": '',
 }
+
+#state_hour: Contiene el estado de la fecha y la hora
 state_hour = {
   'hour': '',
   'date': ''
 }
+
+#state_display: Contiene el estado de la pantalla actual 
 state_display = {
   "screen" : 0,
   "option" : 0,
 }
+
+#click es una variable que registra si el usuario dio un click
 click = 0
+
+#screen y option son variables que provienen de state_display
+#screen es la pantalla actual que se esta mostrando en el display
+#option es la opcion actual de la pantalla actual
 screen, option = state_display.values()
+
+#Las siguientes son colas que se usan para la comunicacion entre hilos:
+#sp_queue_in: Esta cola comparte el estado de Spotify entre los hilos dedicados a Spotify
 sp_queue_in = queue.Queue(maxsize=2)
+
+#sp_queue_out: Esta cola es una copia de sp_queue_in. Es usada por control_spotifyThread
 sp_queue_out = queue.Queue(maxsize=2)
+
+#state_dom_in_queue: Esta cola comparte los datos de los sensores
 state_dom_in_queue = queue.Queue(maxsize=2)
-state_dom_out_queue = queue.Queue(maxsize=2)
+
+#click_queue: Esta cola registra si el usuario dio un click
 click_queue = queue.Queue(maxsize=2)
+
+#Las siguientes dos colas son copias de click_queue
+#Estas colas compartan si el usuaio dio un click hacia:
+#click_ard_queue: Arduino
+#clicksp_queue: hilo click_sp_queue
 click_sp_queue = queue.Queue(maxsize=2)
 click_ard_queue = queue.Queue(maxsize=2)
 
+#Esta funcion o callback sirve para ejecutar cada uno de los hilos
 def exec_func(func):
   func()
 
 
+#control_spotifyThread: Este hilo controla las acciones del usuario cuando
+#esta en la pantalla de Spotify y aplica las acciones en la API de spotify
 def control_spotifyThread():
   global option, screen, sp_queue_out, click_queue, click_sp_queue
   sp_repeat_state = {0:'off', 1:'context', 2:'track'}
@@ -89,6 +128,7 @@ def control_spotifyThread():
       execute_sp_func(option, args_funcs)
 
 
+#sp_inThread: Este hilo obteine continuamente el estado del reproductor de Spotify
 def sp_inThread():
   global state_spotify
   while True:
@@ -97,6 +137,8 @@ def sp_inThread():
     #print(state_spotify)
   
 
+#gasThread: Este hilo obtiene informacion de manera continua del sensor de gas
+#Muestra una alerta en la pantalla en caso de que haya gas
 def gasThread():
   global state_dom_in, state_dom_in_queue, screen
   gas_bef = True
@@ -109,20 +151,21 @@ def gasThread():
     screen = 5 if gas else screen_bef
     gas_bef = gas
     state_dom_in['gas'] = gas
-    #print(state_dom_in)
     state_dom_in_queue.put(state_dom_in)
 
-      
+
+#tempThread: Este hilo obtiene informacion de manera continua del sensor de temperatura
 def tempThread():
   global state_dom_in, state_dom_in_queue
   while True:
     hum, temp = dom.temp_sensor()
     state_dom_in['temp'] = temp
     state_dom_in['hum'] = hum
-    #print(state_dom_in)
     state_dom_in_queue.put(state_dom_in)
 
 
+#dom_outThread: Este hilo ejecuta las acciones hacia las puertas, luz y ventilador
+#dependiendo de la opcion que el usuario escoja
 def dom_outThread():
   global state_dom_out, state_dom_in
   def exec_dom_out(option, action):
@@ -145,54 +188,88 @@ def dom_outThread():
     3:"fan",
     4:"light"
   }
-  #action_pin = 0
   temp = 0
-
-  while True:
-    state_fan = state_dom_out['fan'] 
-    #state_dom_out_queue = state_dom_in_queue
-    click = click_queue.get()
-    #print(option)
-    if state_fan == 2:
-      temp = state_dom_in['temp']
-      action_fan = control_fan_temp(temp)
-      exec_dom_out(3, action_fan)
-    if screen == 0:
-      #print(f"Desde menu: {click, screen}")
-      if option == 3:
-        if click == 1:
-          state_dom_out['fan'] = 0 if state_dom_out['fan'] == 2 else state_dom_out['fan']+1
-          state_fan = state_dom_out['fan']
-          if state_fan == 0:
-            action_fan = 0
-          else: 
-            action_fan = 1
+  
+  try:
+    while True:
+      state_fan = state_dom_out['fan'] 
+      click = click_queue.get()
+      if state_fan == 2:
+        temp = state_dom_in['temp']
+        action_fan = control_fan_temp(temp)
+        exec_dom_out(3, action_fan)
+      if screen == 0:
+        if option == 3:
+          if click == 1:
+            state_dom_out['fan'] = 0 if state_dom_out['fan'] == 2 else state_dom_out['fan']+1
+            state_fan = state_dom_out['fan']
+            action_fan = state_fan if state_fan != 2 else control_fan_temp(temp)
             exec_dom_out(3, action_fan)        
-      elif click == 1:
-        action_pin = not state_dom_out[options[option]]
-        exec_dom_out(option, action_pin)
-        state_dom_out[options[option]] = action_pin
-      #print(state_dom_out)
+        elif click == 1:
+          action_pin = not state_dom_out[options[option]]
+          exec_dom_out(option, action_pin)
+          state_dom_out[options[option]] = action_pin
+  except KeyboardInterrupt:
+    print("Limpiando pines...")
+    GPIO.cleanup()
 
 
+#arduinoThread: Este hilo recibe y manda comandos hacia el Arduino
+#En caso de que se toque el timbre, se mostrara una pantalla preguntando
+#al usuario si desea dejar entrar o no al visitante
+#Si el usuario lleva mas de 3 intentos de insertar el PIN, 
+#O que el dueño de la casa no lo deje entrar, el Arduino se bloqueara
+#por un tiempo, y ese tiempo incrementara dependiendo del numero de intentos
 def arduinoThread():
-    global screen, option, state_dom_in
-    msg = sec.processMsg()
-    if msg == 'W':
-      dom.servomotor(dom.main_door, 1)
-      state_dom_in['p_main'] = 1
-    elif msg == 'T':
-      screen = 4
-    if screen == 4:
-      click = click_ard_queue.get()
-      if click == 1:
-        if option == 0:
-          #print(option, click)
-          dom.servomotor(dom.main_door, 1)
-          state_dom_in['p_main'] = 1
-        screen = 0
-    sec.sendCmd(msg)
+    global screen, option, state_dom_out
+    def sleepBlockArduino(secs: int):
+      current_secs = 0
+      while current_secs < secs:
+        sleep(1)
+        sec.sendCmd('N')
+        current_secs += 1
 
+    failed_retries = 0;
+    timber_denied_retries = 0;
+    blocked = 'N'
+    while True:
+      msg = sec.processMsg()
+      if msg == 'W':
+        dom.servomotor(dom.main_door, 1)
+        state_dom_out['p_main'] = 1
+        blocked = 'N'
+      elif msg == 'T':
+        screen = 4
+        blocked = 'N'
+      else:
+        failed_retries += 1
+        msg = 'D' if failed_retries <= 3 else 'B'
+        blocked = 'P'
+
+      if screen == 4:
+        click = click_ard_queue.get()
+        if click == 1:
+          if option == 0:
+            dom.servomotor(dom.main_door, 1)
+            state_dom_out['p_main'] = 1
+            msg = 'W'
+            blocked = 'N'
+          else:
+            timber_denied_retries += 1
+            msg = 'D' if timber_denied_retries <= 3 else 'B'
+            blocked = 'T'
+          screen = 0
+
+      sec.sendCmd(msg)
+      if failed_retries > 3 and blocked == 'P':
+        sleepBlockArduino(5 * failed_retries)
+      elif timber_denied_retries > 3 and blocked == 'T':
+        sleepBlockArduino(5 * timber_denied_retries)
+      sleep(2)
+      sec.sendCmd('R')
+
+
+#hourThread: Este hilo obtiene continuamente la hora y fecha 
 def hourThread():
   global state_hour
   weekdays = {
@@ -218,6 +295,7 @@ def hourThread():
     state_hour = {'hour': hour, 'date': date}
 
 
+#keyboardThread: Este hilo obtiene los botones que el usuario esta presionando
 def keyboardThread():
   global option, screen
   button_bef = None
@@ -244,7 +322,7 @@ def keyboardThread():
         elif button == 1 and option == 1:
           option = 0
         elif button == 3:
-          print(screen, click)
+          #print(screen, click)
           click_ard_queue.put(1)
         
       elif screen == 1 and button == 4:
@@ -259,6 +337,7 @@ def keyboardThread():
     click_queue.put(0)
 
 
+#displayThread: Este hilo muestra el contenido de la pantalla actual en el display OLED 
 def displayThread():
   index = 0
   global device,screen,option,sp_queue_in,state_spotify,state_dom_in
@@ -281,9 +360,10 @@ def displayThread():
     #print(f"Desde hilo de display: {sp_queue_in}")
     with canvas(device) as draw:
       display.controller(draw, screen, args_screens[screen])
-      index = 0 if screen != 2 else (index + 1) % len(state_spotify['title']) 
+      index = 0 if screen != 2 or not state_spotify['available'] else (index + 1) % len(state_spotify['title']) 
 
 
+#En el bucle principal se ejecutaran todos los hilos de manera simultanea
 if __name__ == "__main__":
   threads_funcs = [tempThread, 
                    gasThread, 
@@ -299,8 +379,5 @@ if __name__ == "__main__":
     thread = threading.Thread(target=exec_func, args=(threads_funcs[i],))
     threads.append(thread)
     thread.start()
-
-"""   for thread in threads:
-    thread.join() """
     
     

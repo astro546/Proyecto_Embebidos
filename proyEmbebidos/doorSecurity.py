@@ -1,3 +1,4 @@
+#Este archivo conteine las funciones que manejan la comunicacion con el Arduino
 import serial, time
 import bcrypt
 from Crypto.Hash import SHA256
@@ -5,11 +6,11 @@ from cryptography.fernet import Fernet
 
 arduino = serial.Serial('/dev/ttyUSB0', 9600)
 
-#Carga la llave para desencriptar los hashes
+#load_masterpass: Carga la llave para desencriptar los hashes
 def load_masterpass():
   return open("masterpass.key","rb").read()
 
-#Desencripta los hashes de la llave para desencriptar 
+#decrypt_file: Desencripta los hashes de la llave para desencriptar 
 # y del pin de acceso
 def decrypt_file(nombre, clave):
   f = Fernet(clave)
@@ -18,7 +19,7 @@ def decrypt_file(nombre, clave):
   decrypted_data = f.decrypt(encrypted_data)
   return decrypted_data
 
-#Vefifica el pin enviado por el Arduino
+#verify_pin: Vefifica el pin enviado por el Arduino
 def verify_pin(encrypted_pin):
   masterpass = load_masterpass()
   hashedPin = decrypt_file('pinpass.key', masterpass)
@@ -26,7 +27,12 @@ def verify_pin(encrypted_pin):
     return True
   return False
 
-#Recibe los mensajes del Arduino  
+#processMsg: Recibe los mensajes del Arduino y retorna el comando correspondiente
+#al Arduino dependiendo del PIN enviado, o la eleccion del usario en el caso 
+#de que se toque el timbre
+#Si el PIN enviado es correcto, o el usuario autoriza abrir la puerta en caso de que se haya tocado el timbre
+#entonces el comando enviado es W, en caso contrario, es D.
+#Cuando se quiere que el arduino no cambie de estado, se envia el comando N
 def processMsg():
   cadena = arduino.readline()
   try:
@@ -36,8 +42,7 @@ def processMsg():
         return 'T'
     return 'N'
   except UnicodeDecodeError:
-    #print(f"Pin encriptado: {cadena}")
-    #print(f"tamaño del texto encriptado: {len(cadena)}")
+    print(f"Procesando pin encriptado")
     if len(cadena) > 0:
       is_verified = verify_pin(cadena)
       if is_verified:
@@ -47,8 +52,7 @@ def processMsg():
       return command
     return 'N'
 
+#sendCmd: Esta funcion manda el comando retornado por processMsg al Arduino
 def sendCmd(command):
+  print(f"Comando enviado: {command}")
   arduino.write(command.encode())
-
-""" while True:
-  processMsg() """
